@@ -1,0 +1,1710 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1e1e1e">
+<title>Менеджер заявок</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: #fff;
+    overflow: hidden;
+  }
+  body { display: flex; }
+
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+  #tabs {
+    display: flex;
+    background: #111;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 10px 18px;
+    cursor: pointer;
+    border-right: 1px solid #333;
+    font-size: 14px;
+    color: #aaa;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab:hover { background: #1a1a1a; color: #fff; }
+  .tab.active { background: #2b2b2b; color: #fff; border-bottom: 2px solid #4caf50; }
+  .tab.dragover {
+    background: rgba(76, 175, 80, 0.25);
+    color: #fff;
+    box-shadow: inset 0 0 0 2px #4caf50;
+  }
+
+  .tab-count {
+    background: #333;
+    color: #ccc;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .tab.active .tab-count { background: #4caf50; color: #fff; }
+  .tab.archive-tab .tab-count { background: #555; }
+  .tab.archive-tab.archive-active .tab-count { background: #ffd87a; color: #222; }
+
+  .tab.archive-tab {
+    background: #2b2b2b;
+    color: #ddd;
+    border: none;
+    border-left: 1px solid #333;
+    border-right: 1px solid #333;
+    font-size: 14px;
+    font-family: inherit;
+    padding: 10px 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab.archive-tab:hover { background: #3a3a3a; color: #fff; }
+  .tab.archive-tab.archive-active {
+    background: #7a5c00;
+    color: #ffd87a;
+    border-bottom: 2px solid #ffd87a;
+  }
+
+  #toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+    background: #181818;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .tool-btn {
+    padding: 6px 12px;
+    background: #2b2b2b;
+    color: #ddd;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+  }
+  .tool-btn:hover { background: #3a3a3a; }
+  .tool-btn.active { background: #4caf50; color: #fff; border-color: #4caf50; }
+  .tool-btn.danger { border-color: #a33; }
+  .tool-btn.danger:hover { background: #a33; color: #fff; }
+  .tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .separator {
+    width: 1px;
+    height: 22px;
+    background: #333;
+    margin: 0 4px;
+  }
+
+  #toolbar input[type="range"] { width: 90px; }
+  #toolbar label { font-size: 12px; color: #aaa; }
+
+  #workspace {
+    flex: 1;
+    position: relative;
+    background: #2b2b2b;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+  #canvasWrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+  }
+  #canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    user-select: none;
+    cursor: crosshair;
+    box-shadow: 0 0 0 1px #444;
+  }
+  #canvas.eraser { cursor: cell; }
+  #canvas.hidden { display: none; }
+
+  #emptyState {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+    font-size: 22px;
+    font-weight: 500;
+    text-align: center;
+    padding: 20px;
+    pointer-events: none;
+    user-select: none;
+  }
+  #emptyState.show { display: flex; }
+
+  #rightPanel {
+    width: 340px;
+    background: #111;
+    border-left: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-height: 0;
+  }
+
+  #rightTop {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    background: linear-gradient(180deg, rgba(76,175,80,0.18), rgba(76,175,80,0.06));
+    border-bottom: 1px solid rgba(76,175,80,0.35);
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .green-btn {
+    flex: 1;
+    padding: 7px 10px;
+    background: rgba(76, 175, 80, 0.35);
+    color: #eaffea;
+    border: 1px solid rgba(76, 175, 80, 0.7);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    user-select: none;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
+  }
+  .green-btn:hover {
+    background: rgba(76, 175, 80, 0.55);
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  }
+  .green-btn.on {
+    background: rgba(76, 175, 80, 0.8);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
+  }
+  .green-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  #sidebar {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .thumb {
+    border: 2px solid #444;
+    border-radius: 6px;
+    cursor: pointer;
+    overflow: hidden;
+    background: #222;
+    position: relative;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .thumb:hover { border-color: #666; }
+  .thumb.active { border-color: #4caf50; }
+  .thumb.dragging { opacity: 0.4; }
+  .thumb img { display: block; width: 100%; height: auto; }
+  .thumb .date {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: #ccc;
+    font-size: 11px;
+    padding: 3px 6px;
+    text-align: center;
+  }
+
+  .thumb-buttons {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 3px;
+    z-index: 2;
+  }
+  .ic-btn {
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    line-height: 1.2;
+  }
+  .ic-btn:hover { background: #4caf50; }
+  .ic-btn.del-btn:hover { background: #c33; }
+
+  .move-menu {
+    position: absolute;
+    top: 4px;
+    right: 32px;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .move-menu button {
+    background: transparent;
+    color: #ddd;
+    border: none;
+    text-align: left;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .move-menu button:hover { background: #4caf50; color: #fff; }
+  .move-menu button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .empty {
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+    padding: 20px 10px;
+  }
+
+  .textInput {
+    position: absolute;
+    background: rgba(0,0,0,0.3);
+    color: red;
+    border: 1px dashed #fff;
+    font-size: 24px;
+    font-weight: bold;
+    outline: none;
+    padding: 2px 4px;
+    min-width: 60px;
+    font-family: Arial, sans-serif;
+    z-index: 10;
+  }
+
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    font-size: 18px;
+    color: #fff;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    padding: 20px;
+  }
+  #overlay button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    background: #4caf50;
+    color: #fff;
+  }
+  #overlay button:hover { background: #43a047; }
+</style>
+</head>
+<body>
+
+<div id="main">
+  <div id="tabs">
+    <button class="tab archive-tab" id="btnArchive">
+      📁 Архив <span class="tab-count" id="archiveCount">0</span>
+    </button>
+  </div>
+
+  <div id="toolbar">
+    <button class="tool-btn" id="btnMark" data-tool="mark">● Метка</button>
+    <button class="tool-btn" id="btnEraser" data-tool="eraser">⌫ Ластик</button>
+    <div class="separator"></div>
+    <label>Кисть: <input type="range" id="brushSize" min="4" max="80" value="20"></label>
+    <span id="brushSizeVal" style="font-size:12px;color:#888;">20</span>
+    <div class="separator"></div>
+    <button class="tool-btn" id="btnUndo" title="Ctrl+Z">↶ Отменить</button>
+    <button class="tool-btn" id="btnRedo" title="Ctrl+Y">↷ Вернуть</button>
+    <div class="separator"></div>
+    <button class="tool-btn" id="btnOpenFolder" title="Открыть рабочую папку">📂 Папка</button>
+    <button class="tool-btn" id="btnSaveAll" title="Сохранить все фото в папку" disabled>💾 В папку</button>
+    <div class="separator"></div>
+    <button class="tool-btn danger" id="btnClear">Очистить всё</button>
+    <button class="tool-btn danger" id="btnClearMarks">Только метки</button>
+    <button class="tool-btn danger" id="btnClearTexts">Только тексты</button>
+  </div>
+
+  <div id="workspace">
+    <div id="canvasWrap"><canvas id="canvas"></canvas></div>
+    <div id="emptyState">Пока что нет активных заявок</div>
+  </div>
+</div>
+
+<div id="rightPanel">
+  <div id="rightTop">
+    <button class="green-btn" id="btnDone">✓ Выполнено</button>
+  </div>
+  <div id="sidebar"></div>
+</div>
+
+<div id="overlay">
+  <div>Загрузка базы данных…</div>
+</div>
+
+<script>
+"use strict";
+
+const DEPARTMENTS = ['Кичуй-Выезд', 'Кичуй-Цех', 'Азн-Выезд', 'Азн-Цех'];
+const PREVIEW_LIMIT = 5;
+const UNDO_LIMIT = 100;
+
+const workspace = document.getElementById('workspace');
+const canvasWrap = document.getElementById('canvasWrap');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const sidebar = document.getElementById('sidebar');
+const tabsEl = document.getElementById('tabs');
+const overlay = document.getElementById('overlay');
+const emptyState = document.getElementById('emptyState');
+const archiveCountEl = document.getElementById('archiveCount');
+const btnMark = document.getElementById('btnMark');
+const btnEraser = document.getElementById('btnEraser');
+const brushSize = document.getElementById('brushSize');
+const brushSizeVal = document.getElementById('brushSizeVal');
+const btnClear = document.getElementById('btnClear');
+const btnClearMarks = document.getElementById('btnClearMarks');
+const btnClearTexts = document.getElementById('btnClearTexts');
+const btnUndo = document.getElementById('btnUndo');
+const btnRedo = document.getElementById('btnRedo');
+const btnDone = document.getElementById('btnDone');
+const btnArchive = document.getElementById('btnArchive');
+const btnOpenFolder = document.getElementById('btnOpenFolder');
+const btnSaveAll = document.getElementById('btnSaveAll');
+
+let db = null;
+let activeDept = DEPARTMENTS[0];
+let activeIndex = -1;
+let images = [];
+let showArchive = false;
+let currentTool = 'mark';
+let isDrawing = false;
+let lastPoint = null;
+
+// Состояние для прямоугольника на СКМ
+let isRectDrawing = false;
+let rectStart = null;
+let rectCurrent = null;
+
+let deptCounts = {};
+let archiveCount = 0;
+
+// File System Access API
+let dirHandle = null;
+let dirFileHandles = {};
+const FS_SUPPORTED = 'showDirectoryPicker' in window;
+
+// ---------- IndexedDB ----------
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB не поддерживается браузером'));
+      return;
+    }
+    const req = indexedDB.open('photoEditorDB', 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('photos')) {
+        d.createObjectStore('photos', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(); };
+    req.onerror = e => reject(e.target.error || new Error('Ошибка открытия БД'));
+    req.onblocked = () => reject(new Error('БД заблокирована другой вкладкой'));
+  });
+}
+
+function tx(mode) { return db.transaction('photos', mode).objectStore('photos'); }
+function dbAdd(rec) {
+  return new Promise((res, rej) => {
+    const r = tx('readwrite').add(rec);
+    r.onsuccess = () => res(r.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+function dbPut(rec) {
+  return new Promise((res, rej) => {
+    const r = tx('readwrite').put(rec);
+    r.onsuccess = () => res(r.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+function dbDelete(id) {
+  return new Promise((res, rej) => {
+    const r = tx('readwrite').delete(id);
+    r.onsuccess = () => res();
+    r.onerror = e => rej(e.target.error);
+  });
+}
+function dbGetAll() {
+  return new Promise((res, rej) => {
+    const r = tx('readonly').getAll();
+    r.onsuccess = () => res(r.result || []);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+// ---------- Counts ----------
+async function refreshCounts() {
+  let all = [];
+  try { all = await dbGetAll(); } catch (e) { console.error(e); }
+
+  deptCounts = {};
+  DEPARTMENTS.forEach(d => { deptCounts[d] = 0; });
+  archiveCount = 0;
+
+  for (const r of all) {
+    if (r.done) {
+      archiveCount++;
+    } else {
+      if (deptCounts[r.dept] === undefined) deptCounts[r.dept] = 0;
+      deptCounts[r.dept]++;
+    }
+  }
+
+  archiveCountEl.textContent = archiveCount;
+
+  tabsEl.querySelectorAll('.tab:not(.archive-tab)').forEach(el => {
+    const c = el.querySelector('.tab-count');
+    if (c) c.textContent = deptCounts[el.dataset.dept] || 0;
+  });
+}
+
+// ---------- Tabs ----------
+function renderTabs() {
+  tabsEl.querySelectorAll('.tab:not(.archive-tab)').forEach(el => el.remove());
+
+  DEPARTMENTS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (d === activeDept ? ' active' : '');
+    el.dataset.dept = d;
+
+    const label = document.createElement('span');
+    label.textContent = d;
+    el.appendChild(label);
+
+    const cnt = document.createElement('span');
+    cnt.className = 'tab-count';
+    cnt.textContent = '0';
+    el.appendChild(cnt);
+
+    el.onclick = () => switchDept(d);
+
+    el.addEventListener('dragover', e => {
+      if (e.dataTransfer.types.includes('text/x-photo-id')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        el.classList.add('dragover');
+      }
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('dragover'));
+    el.addEventListener('drop', async e => {
+      el.classList.remove('dragover');
+      const idStr = e.dataTransfer.getData('text/x-photo-id');
+      if (!idStr) return;
+      e.preventDefault();
+      const id = Number(idStr);
+      await movePhotoToDept(id, d);
+    });
+
+    tabsEl.insertBefore(el, btnArchive);
+  });
+
+  refreshCounts();
+}
+
+async function switchDept(d) {
+  if (d === activeDept) return;
+  activeDept = d;
+  activeIndex = -1;
+  renderTabs();
+  await loadImages();
+}
+
+// ---------- Images ----------
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('Не удалось загрузить изображение'));
+    img.src = src;
+  });
+}
+
+async function loadImages() {
+  let all = [];
+  try { all = await dbGetAll(); } catch (e) { console.error('dbGetAll error', e); }
+
+  const filtered = all
+    .filter(r => r.dept === activeDept && !!r.done === showArchive)
+    .sort((a, b) => a.added - b.added);
+
+  images = [];
+  for (const rec of filtered) {
+    try {
+      const img = await loadImage(rec.data);
+      const im = {
+        id: rec.id,
+        dept: rec.dept,
+        data: rec.data,
+        marks: rec.marks || [],
+        texts: rec.texts || [],
+        rects: rec.rects || [],
+        added: rec.added || Date.now(),
+        done: !!rec.done,
+        name: rec.name || null,
+        el: img,
+        history: [],
+        histIndex: 0
+      };
+      im.history = [snapshotOf(im)];
+      im.histIndex = 0;
+      images.push(im);
+    } catch (e) {
+      console.warn('bad image record', rec.id, e);
+    }
+  }
+  renderSidebar();
+  if (images.length > 0) {
+    selectImage(0);
+  } else {
+    activeIndex = -1;
+    canvas.width = 0;
+    canvas.height = 0;
+    ctx.clearRect(0, 0, 1, 1);
+    canvas.classList.add('hidden');
+    emptyState.classList.add('show');
+    updateUndoButtons();
+    updateTopButtons();
+  }
+  refreshCounts();
+  updateFolderUI();
+}
+
+function snapshotOf(im) {
+  return {
+    marks: clone(im.marks),
+    texts: clone(im.texts),
+    rects: clone(im.rects || []),
+    done: !!im.done,
+    dept: im.dept
+  };
+}
+
+async function addImage(dataUrl) {
+  try {
+    const rec = {
+      dept: activeDept,
+      data: dataUrl,
+      marks: [],
+      texts: [],
+      rects: [],
+      added: Date.now(),
+      done: false
+    };
+    const id = await dbAdd(rec);
+    rec.id = id;
+    rec.el = await loadImage(dataUrl);
+    rec.marks = [];
+    rec.texts = [];
+    rec.rects = [];
+    rec.history = [snapshotOf(rec)];
+    rec.histIndex = 0;
+
+    if (showArchive) {
+      showArchive = false;
+      updateArchiveButton();
+      await loadImages();
+      const idx = images.findIndex(x => x.id === id);
+      if (idx >= 0) selectImage(idx);
+    } else {
+      images.push(rec);
+      images.sort((a, b) => a.added - b.added);
+      renderSidebar();
+      const idx = images.findIndex(x => x.id === id);
+      if (idx >= 0) selectImage(idx);
+    }
+    refreshCounts();
+  } catch (e) {
+    console.error('addImage error', e);
+    alert('Не удалось сохранить изображение: ' + e.message);
+  }
+}
+
+async function persistImage(im) {
+  try {
+    await dbPut({
+      id: im.id,
+      dept: im.dept,
+      data: im.data,
+      marks: im.marks,
+      texts: im.texts,
+      rects: im.rects || [],
+      added: im.added,
+      done: !!im.done,
+      name: im.name || null
+    });
+  } catch (err) { console.error(err); }
+}
+
+// ---------- Move between depts ----------
+async function movePhotoToDept(id, targetDept) {
+  const all = await dbGetAll();
+  const rec = all.find(r => r.id === id);
+  if (!rec) return;
+  if (rec.dept === targetDept) return;
+  rec.dept = targetDept;
+  await dbPut(rec);
+  await loadImages();
+}
+
+// ---------- History ----------
+function pushHistory(im) {
+  if (!im) return;
+  im.history = im.history.slice(0, im.histIndex + 1);
+  const last = im.history[im.history.length - 1];
+  const cur = snapshotOf(im);
+  if (JSON.stringify(last) === JSON.stringify(cur)) return;
+  im.history.push(cur);
+  if (im.history.length > UNDO_LIMIT) im.history.shift();
+  im.histIndex = im.history.length - 1;
+  updateUndoButtons();
+}
+
+function applySnapshot(im, st) {
+  im.marks = clone(st.marks);
+  im.texts = clone(st.texts);
+  im.rects = clone(st.rects || []);
+  im.done = !!st.done;
+}
+
+function undo() {
+  const im = images[activeIndex];
+  if (!im || im.histIndex <= 0) return;
+  im.histIndex--;
+  applySnapshot(im, im.history[im.histIndex]);
+  redraw();
+  renderSidebar();
+  updateTopButtons();
+  persistImage(im);
+  updateUndoButtons();
+}
+
+function redo() {
+  const im = images[activeIndex];
+  if (!im || im.histIndex >= im.history.length - 1) return;
+  im.histIndex++;
+  applySnapshot(im, im.history[im.histIndex]);
+  redraw();
+  renderSidebar();
+  updateTopButtons();
+  persistImage(im);
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  const im = images[activeIndex];
+  if (!im) { btnUndo.disabled = true; btnRedo.disabled = true; return; }
+  btnUndo.disabled = im.histIndex <= 0;
+  btnRedo.disabled = im.histIndex >= im.history.length - 1;
+}
+
+function updateTopButtons() {
+  const im = images[activeIndex];
+  if (!im) {
+    btnDone.disabled = true;
+    btnDone.classList.remove('on');
+  } else {
+    btnDone.disabled = false;
+    btnDone.classList.toggle('on', !!im.done);
+  }
+  if (btnSaveAll) {
+    btnSaveAll.disabled = !dirHandle || images.length === 0;
+  }
+}
+
+function updateArchiveButton() {
+  btnArchive.classList.toggle('archive-active', showArchive);
+  let label = btnArchive.firstChild;
+  if (!label || label.nodeType !== Node.TEXT_NODE) {
+    label = document.createTextNode('');
+    btnArchive.insertBefore(label, btnArchive.firstChild);
+  }
+  label.textContent = showArchive ? '📁 Архив • вкл ' : '📁 Архив ';
+}
+
+btnUndo.onclick = undo;
+btnRedo.onclick = redo;
+
+btnArchive.onclick = async () => {
+  showArchive = !showArchive;
+  activeIndex = -1;
+  updateArchiveButton();
+  await loadImages();
+};
+
+// ---------- Done button ----------
+btnDone.onclick = async () => {
+  const im = images[activeIndex];
+  if (!im) return;
+  im.done = !im.done;
+  await persistImage(im);
+  const idx = activeIndex;
+  await loadImages();
+  if (images.length === 0) {
+    activeIndex = -1;
+    canvas.width = 0;
+    canvas.height = 0;
+    ctx.clearRect(0, 0, 1, 1);
+    canvas.classList.add('hidden');
+    emptyState.classList.add('show');
+    updateUndoButtons();
+    updateTopButtons();
+  } else {
+    selectImage(Math.min(idx, images.length - 1));
+  }
+  refreshCounts();
+};
+
+// ---------- Rendering ----------
+function drawEdits(c, im, scale) {
+  const s = scale || 1;
+
+  (im.rects || []).forEach(r => {
+    const x = Math.min(r.x1, r.x2) * s;
+    const y = Math.min(r.y1, r.y2) * s;
+    const w = Math.abs(r.x2 - r.x1) * s;
+    const h = Math.abs(r.y2 - r.y1) * s;
+    c.fillStyle = 'rgba(46, 204, 113, 0.45)';
+    c.fillRect(x, y, w, h);
+    c.strokeStyle = 'rgba(39, 174, 96, 0.95)';
+    c.lineWidth = Math.max(2, 3 * s);
+    c.strokeRect(x, y, w, h);
+  });
+
+  im.marks.forEach(m => {
+    if (m.type === 'line') {
+      c.beginPath();
+      c.moveTo(m.x1 * s, m.y1 * s);
+      c.lineTo(m.x2 * s, m.y2 * s);
+      c.strokeStyle = 'red';
+      c.lineWidth = (m.width || 8) * s;
+      c.lineCap = 'round';
+      c.stroke();
+    } else {
+      c.beginPath();
+      c.arc(m.x * s, m.y * s, ((m.width || 16) / 2) * s, 0, Math.PI * 2);
+      c.fillStyle = 'red';
+      c.fill();
+      c.strokeStyle = '#fff';
+      c.lineWidth = 2 * s;
+      c.stroke();
+    }
+  });
+
+  im.texts.forEach(t => {
+    c.font = `bold ${32 * s}px Arial`;
+    c.fillStyle = 'red';
+    c.textBaseline = 'top';
+    c.fillText(t.text, t.x * s, t.y * s);
+  });
+
+  if (im.done) {
+    const w = c.canvas.width;
+    const h = c.canvas.height;
+    const fontSize = Math.max(28, Math.round(Math.min(w, h) * 0.09));
+    c.font = `bold ${fontSize}px Arial`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+
+    const text = 'Выполнено';
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const m = c.measureText(text);
+    const padX = fontSize * 0.6;
+    const padY = fontSize * 0.35;
+    const boxW = m.width + padX * 2;
+    const boxH = fontSize + padY * 2;
+
+    c.save();
+    c.globalAlpha = 0.75;
+    c.fillStyle = 'rgba(30, 120, 50, 0.35)';
+    roundRect(c, cx - boxW/2, cy - boxH/2, boxW, boxH, fontSize * 0.3);
+    c.fill();
+
+    c.strokeStyle = 'rgba(120, 230, 140, 0.9)';
+    c.lineWidth = Math.max(2, fontSize * 0.06);
+    roundRect(c, cx - boxW/2, cy - boxH/2, boxW, boxH, fontSize * 0.3);
+    c.stroke();
+
+    c.globalAlpha = 0.98;
+    c.fillStyle = 'rgba(255, 255, 255, 0.98)';
+    c.fillText(text, cx, cy + fontSize * 0.05);
+    c.restore();
+
+    c.textAlign = 'start';
+    c.textBaseline = 'top';
+  }
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+// ---------- Thumbnails ----------
+function renderEditedToDataURL(im, maxW, maxH) {
+  const tmp = document.createElement('canvas');
+  const scale = Math.min(
+    maxW / im.el.naturalWidth,
+    maxH / im.el.naturalHeight,
+    1
+  );
+  tmp.width = Math.max(1, Math.round(im.el.naturalWidth * scale));
+  tmp.height = Math.max(1, Math.round(im.el.naturalHeight * scale));
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(im.el, 0, 0, tmp.width, tmp.height);
+  drawEdits(tctx, im, scale);
+  return tmp.toDataURL('image/jpeg', 0.7);
+}
+
+// ---------- Sidebar ----------
+function formatDate(ts) {
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function renderSidebar() {
+  sidebar.innerHTML = '';
+
+  if (images.length === 0) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = showArchive ? 'Архив пуст' : 'Нет фото в этом отделе';
+    sidebar.appendChild(e);
+    return;
+  }
+
+  let list = images.map((im, idx) => ({ im, idx }));
+  if (activeIndex >= 0) {
+    const start = Math.max(0, Math.min(activeIndex - 2, images.length - PREVIEW_LIMIT));
+    list = list.slice(start, start + PREVIEW_LIMIT);
+  } else {
+    list = list.slice(0, PREVIEW_LIMIT);
+  }
+
+  list.forEach(({ im, idx }) => {
+    const d = document.createElement('div');
+    d.className = 'thumb' + (idx === activeIndex ? ' active' : '');
+    d.draggable = true;
+    d.dataset.id = im.id;
+
+    d.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/x-photo-id', String(im.id));
+      e.dataTransfer.effectAllowed = 'move';
+      d.classList.add('dragging');
+    });
+    d.addEventListener('dragend', () => d.classList.remove('dragging'));
+
+    const thumb = document.createElement('img');
+    thumb.src = renderEditedToDataURL(im, 300, 300);
+    d.appendChild(thumb);
+
+    const btns = document.createElement('div');
+    btns.className = 'thumb-buttons';
+
+    const moveBtn = document.createElement('button');
+    moveBtn.className = 'ic-btn';
+    moveBtn.textContent = '→';
+    moveBtn.title = 'Переместить в другой отдел';
+    moveBtn.onclick = (e) => {
+      e.stopPropagation();
+      openMoveMenu(d, im);
+    };
+    btns.appendChild(moveBtn);
+
+    const del = document.createElement('button');
+    del.className = 'ic-btn del-btn';
+    del.textContent = '✕';
+    del.title = 'Удалить';
+    del.onclick = async (e) => {
+      e.stopPropagation();
+      await deleteImage(idx);
+    };
+    btns.appendChild(del);
+
+    d.appendChild(btns);
+
+    const date = document.createElement('div');
+    date.className = 'date';
+    date.textContent = formatDate(im.added);
+    d.appendChild(date);
+
+    d.onclick = () => selectImage(idx);
+    sidebar.appendChild(d);
+  });
+
+  if (images.length > PREVIEW_LIMIT) {
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:12px;color:#888;text-align:center;padding:6px;';
+    info.textContent = `${activeIndex + 1} / ${images.length}  (← → ↑ ↓ / колесо для листания)`;
+    sidebar.appendChild(info);
+  }
+}
+
+function openMoveMenu(thumbEl, im) {
+  document.querySelectorAll('.move-menu').forEach(m => m.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'move-menu';
+
+  DEPARTMENTS.forEach(dep => {
+    const b = document.createElement('button');
+    b.textContent = dep;
+    if (dep === im.dept) {
+      b.disabled = true;
+      b.textContent = dep + '  (текущий)';
+    }
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      menu.remove();
+      await movePhotoToDept(im.id, dep);
+    };
+    menu.appendChild(b);
+  });
+
+  setTimeout(() => {
+    const close = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.remove();
+        document.removeEventListener('mousedown', close);
+      }
+    };
+    document.addEventListener('mousedown', close);
+  }, 0);
+
+  thumbEl.appendChild(menu);
+}
+
+async function deleteImage(i) {
+  const im = images[i];
+  if (!im) return;
+
+  if (!confirm('Удалить это фото? Восстановить не получится.')) return;
+
+  try { await dbDelete(im.id); } catch (e) { console.error(e); }
+  images.splice(i, 1);
+  if (images.length === 0) {
+    activeIndex = -1;
+    canvas.width = 0;
+    canvas.height = 0;
+    ctx.clearRect(0, 0, 1, 1);
+    canvas.classList.add('hidden');
+    emptyState.classList.add('show');
+    renderSidebar();
+    updateUndoButtons();
+    updateTopButtons();
+  } else {
+    if (activeIndex >= images.length) activeIndex = images.length - 1;
+    selectImage(activeIndex);
+  }
+  refreshCounts();
+}
+
+// ---------- Canvas ----------
+function selectImage(i) {
+  if (i < 0 || i >= images.length) return;
+  activeIndex = i;
+  const im = images[i];
+  canvas.width = im.el.naturalWidth;
+  canvas.height = im.el.naturalHeight;
+  canvas.classList.remove('hidden');
+  emptyState.classList.remove('show');
+  redraw();
+  renderSidebar();
+  updateUndoButtons();
+  updateTopButtons();
+}
+
+function redraw() {
+  const im = images[activeIndex];
+  if (!im) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(im.el, 0, 0);
+  drawEdits(ctx, im, 1);
+
+  if (isRectDrawing && rectStart && rectCurrent) {
+    const x = Math.min(rectStart.x, rectCurrent.x);
+    const y = Math.min(rectStart.y, rectCurrent.y);
+    const w = Math.abs(rectCurrent.x - rectStart.x);
+    const h = Math.abs(rectCurrent.y - rectStart.y);
+    ctx.fillStyle = 'rgba(46, 204, 113, 0.35)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(39, 174, 96, 1)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 6]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+  }
+}
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  return {
+    x: (e.clientX - r.left) * scaleX,
+    y: (e.clientY - r.top) * scaleY
+  };
+}
+
+// ---------- Tools ----------
+function setTool(t) {
+  currentTool = t;
+  btnMark.classList.toggle('active', t === 'mark');
+  btnEraser.classList.toggle('active', t === 'eraser');
+  canvas.classList.toggle('eraser', t === 'eraser');
+}
+btnMark.onclick = () => setTool('mark');
+btnEraser.onclick = () => setTool('eraser');
+brushSize.oninput = () => { brushSizeVal.textContent = brushSize.value; };
+
+// ---------- Eraser ----------
+function eraseAt(x, y, radius) {
+  const im = images[activeIndex];
+  if (!im) return;
+  const r2 = radius * radius;
+
+  im.marks = im.marks.filter(m => {
+    if (m.type === 'line') return !pointNearSegment(x, y, m.x1, m.y1, m.x2, m.y2, radius);
+    const dx = m.x - x, dy = m.y - y;
+    return dx*dx + dy*dy > r2;
+  });
+
+  ctx.font = 'bold 32px Arial';
+  im.texts = im.texts.filter(t => {
+    const w = ctx.measureText(t.text).width;
+    const h = 32;
+    const cx = Math.max(t.x, Math.min(x, t.x + w));
+    const cy = Math.max(t.y, Math.min(y, t.y + h));
+    const dx = cx - x, dy = cy - y;
+    return dx*dx + dy*dy > r2;
+  });
+
+  im.rects = (im.rects || []).filter(r => {
+    const x1 = Math.min(r.x1, r.x2), x2 = Math.max(r.x1, r.x2);
+    const y1 = Math.min(r.y1, r.y2), y2 = Math.max(r.y1, r.y2);
+    const cx = Math.max(x1, Math.min(x, x2));
+    const cy = Math.max(y1, Math.min(y, y2));
+    const dx = cx - x, dy = cy - y;
+    return dx*dx + dy*dy > r2;
+  });
+}
+
+function pointNearSegment(px, py, x1, y1, x2, y2, r) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len2 = dx*dx + dy*dy;
+  let t = len2 === 0 ? 0 : ((px - x1)*dx + (py - y1)*dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t*dx, cy = y1 + t*dy;
+  const ddx = px - cx, ddy = py - cy;
+  return ddx*ddx + ddy*ddy <= r*r;
+}
+
+// ---------- Mouse on canvas ----------
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('mousedown', e => {
+  if (activeIndex === -1) return;
+
+  if (e.button === 1) {
+    e.preventDefault();
+    const pos = getPos(e);
+    isRectDrawing = true;
+    rectStart = pos;
+    rectCurrent = pos;
+    redraw();
+    return;
+  }
+
+  if (e.button !== 0) return;
+  const pos = getPos(e);
+  isDrawing = true;
+  lastPoint = pos;
+
+  if (currentTool === 'eraser') {
+    eraseAt(pos.x, pos.y, Number(brushSize.value));
+    redraw();
+  } else {
+    const im = images[activeIndex];
+    im.marks.push({ type: 'dot', x: pos.x, y: pos.y, width: Number(brushSize.value) });
+    redraw();
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isRectDrawing) {
+    rectCurrent = getPos(e);
+    redraw();
+    return;
+  }
+
+  if (!isDrawing) return;
+  if (activeIndex === -1) return;
+  const pos = getPos(e);
+
+  if (currentTool === 'eraser') {
+    eraseAt(pos.x, pos.y, Number(brushSize.value));
+    redraw();
+  } else {
+    const im = images[activeIndex];
+    im.marks.push({
+      type: 'line',
+      x1: lastPoint.x, y1: lastPoint.y,
+      x2: pos.x, y2: pos.y,
+      width: Number(brushSize.value)
+    });
+    lastPoint = pos;
+    redraw();
+  }
+});
+
+window.addEventListener('mouseup', async e => {
+  if (isRectDrawing) {
+    isRectDrawing = false;
+    if (rectStart && rectCurrent && activeIndex !== -1) {
+      const w = Math.abs(rectCurrent.x - rectStart.x);
+      const h = Math.abs(rectCurrent.y - rectStart.y);
+      if (w > 4 && h > 4) {
+        const im = images[activeIndex];
+        im.rects = im.rects || [];
+        im.rects.push({
+          x1: rectStart.x, y1: rectStart.y,
+          x2: rectCurrent.x, y2: rectCurrent.y
+        });
+        pushHistory(im);
+        await persistImage(im);
+      }
+    }
+    rectStart = null;
+    rectCurrent = null;
+    redraw();
+    renderSidebar();
+    updateUndoButtons();
+    return;
+  }
+
+  if (!isDrawing) return;
+  isDrawing = false;
+  lastPoint = null;
+  if (activeIndex !== -1) {
+    const im = images[activeIndex];
+    pushHistory(im);
+    renderSidebar();
+    updateUndoButtons();
+    await persistImage(im);
+  }
+});
+
+document.addEventListener('mousedown', e => {
+  if (e.button === 1) e.preventDefault();
+});
+
+// ---------- Text input ----------
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (activeIndex === -1) return;
+  const pos = getPos(e);
+  startTextInput(pos.x, pos.y);
+});
+
+function startTextInput(x, y) {
+  const im = images[activeIndex];
+  const r = canvas.getBoundingClientRect();
+  const wr = canvasWrap.getBoundingClientRect();
+  const scaleX = r.width / canvas.width;
+  const scaleY = r.height / canvas.height;
+
+  const inp = document.createElement('input');
+  inp.className = 'textInput';
+  inp.style.left = (r.left - wr.left + x * scaleX) + 'px';
+  inp.style.top  = (r.top  - wr.top  + y * scaleY) + 'px';
+  canvasWrap.appendChild(inp);
+  inp.focus();
+
+  let done = false;
+  const finish = async () => {
+    if (done) return;
+    done = true;
+    const val = inp.value.trim();
+    if (val) {
+      im.texts.push({ text: val, x, y });
+      pushHistory(im);
+      await persistImage(im);
+    }
+    inp.remove();
+    if (document.activeElement && document.activeElement !== document.body) {
+      try { document.activeElement.blur(); } catch (e) {}
+    }
+    document.body.focus();
+    redraw();
+    renderSidebar();
+    updateUndoButtons();
+  };
+
+  inp.addEventListener('blur', finish);
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+    if (ev.key === 'Escape') { ev.value = ''; inp.blur(); }
+  });
+}
+
+// ---------- Keyboard ----------
+document.addEventListener('keydown', e => {
+  const target = e.target;
+  const inEditable = target && (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.isContentEditable
+  );
+
+  if (!inEditable && (e.ctrlKey || e.metaKey)) {
+    if (e.code === 'KeyZ' && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      undo();
+      return;
+    }
+    if (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      redo();
+      return;
+    }
+  }
+
+  if (inEditable) return;
+
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    if (activeIndex < images.length - 1) {
+      e.preventDefault();
+      selectImage(activeIndex + 1);
+    }
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    if (activeIndex > 0) {
+      e.preventDefault();
+      selectImage(activeIndex - 1);
+    }
+  }
+}, true);
+
+document.querySelectorAll('button').forEach(b => {
+  b.addEventListener('mousedown', e => e.preventDefault());
+});
+
+// ---------- Sidebar wheel ----------
+sidebar.addEventListener('wheel', e => {
+  if (images.length < 2) return;
+  e.preventDefault();
+  if (e.deltaY > 0) {
+    if (activeIndex < images.length - 1) selectImage(activeIndex + 1);
+  } else if (e.deltaY < 0) {
+    if (activeIndex > 0) selectImage(activeIndex - 1);
+  }
+}, { passive: false });
+
+// ---------- Clear ----------
+btnClear.onclick = async () => {
+  if (activeIndex === -1) return;
+  if (!confirm('Удалить все метки, тексты и прямоугольники на этом фото?')) return;
+  const im = images[activeIndex];
+  im.marks = [];
+  im.texts = [];
+  im.rects = [];
+  pushHistory(im);
+  redraw();
+  renderSidebar();
+  updateUndoButtons();
+  await persistImage(im);
+};
+
+btnClearMarks.onclick = async () => {
+  if (activeIndex === -1) return;
+  const im = images[activeIndex];
+  im.marks = [];
+  pushHistory(im);
+  redraw();
+  renderSidebar();
+  updateUndoButtons();
+  await persistImage(im);
+};
+
+btnClearTexts.onclick = async () => {
+  if (activeIndex === -1) return;
+  const im = images[activeIndex];
+  im.texts = [];
+  pushHistory(im);
+  redraw();
+  renderSidebar();
+  updateUndoButtons();
+  await persistImage(im);
+};
+
+// ---------- Paste ----------
+function fileToDataURL(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => rej(new Error('Ошибка чтения файла'));
+    fr.readAsDataURL(file);
+  });
+}
+
+document.addEventListener('paste', async e => {
+  const cd = e.clipboardData;
+  if (!cd) return;
+
+  const items = cd.items;
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const file = it.getAsFile();
+        if (file) {
+          e.preventDefault();
+          try {
+            const dataUrl = await fileToDataURL(file);
+            await addImage(dataUrl);
+          } catch (err) {
+            console.error(err);
+            alert('Не удалось прочитать изображение: ' + err.message);
+          }
+          return;
+        }
+      }
+    }
+  }
+  const files = cd.files;
+  if (files && files.length) {
+    for (const f of files) {
+      if (f.type.startsWith('image/')) {
+        e.preventDefault();
+        try {
+          const dataUrl = await fileToDataURL(f);
+          await addImage(dataUrl);
+        } catch (err) {
+          console.error(err);
+          alert('Не удалось прочитать изображение: ' + err.message);
+        }
+        return;
+      }
+    }
+  }
+});
+
+// ============================================================
+// File System Access API
+// ============================================================
+
+if (!FS_SUPPORTED) {
+  btnOpenFolder.disabled = true;
+  btnOpenFolder.title = 'File System Access API не поддерживается (нужен Chrome/Edge)';
+}
+
+async function restoreDirAccess() {
+  if (!FS_SUPPORTED) return;
+
+  try {
+    const saved = await idbGetHandle();
+    if (!saved) return;
+
+    const perm = await saved.queryPermission({ mode: 'readwrite' });
+    if (perm === 'granted') {
+      dirHandle = saved;
+      await scanFolderFiles();
+      updateFolderUI();
+    } else if (perm === 'prompt') {
+      dirHandle = saved;
+      btnOpenFolder.textContent = '📂 Подтвердить папку';
+      btnOpenFolder.title = 'Нажмите, чтобы восстановить доступ к папке';
+    }
+  } catch (e) {
+    console.warn('restoreDirAccess failed', e);
+  }
+}
+
+btnOpenFolder.onclick = async () => {
+  if (!FS_SUPPORTED) return;
+
+  try {
+    if (dirHandle && !(await hasWritePermission(dirHandle))) {
+      const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') {
+        alert('Доступ к папке не подтверждён.');
+        return;
+      }
+    } else if (!dirHandle) {
+      dirHandle = await window.showDirectoryPicker({
+        mode: 'readwrite',
+        startIn: 'pictures'
+      });
+    }
+
+    await idbSaveHandle(dirHandle);
+    await scanFolderFiles();
+    updateFolderUI();
+
+    const n = Object.keys(dirFileHandles).length;
+    console.log(`В папке найдено совпадений: ${n}`);
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    console.error('Ошибка доступа к папке:', e);
+    alert('Не удалось открыть папку: ' + e.message);
+  }
+};
+
+async function hasWritePermission(handle) {
+  const opts = { mode: 'readwrite' };
+  if ((await handle.queryPermission(opts)) === 'granted') return true;
+  return (await handle.requestPermission(opts)) === 'granted';
+}
+
+async function scanFolderFiles() {
+  dirFileHandles = {};
+  if (!dirHandle) return;
+
+  const folderFiles = new Map();
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'file' && /\.(png|jpe?g|webp|gif|bmp)$/i.test(name)) {
+      folderFiles.set(name.toLowerCase(), handle);
+    }
+  }
+
+  const all = await dbGetAll();
+  for (const rec of all) {
+    if (!rec.name) continue;
+    const h = folderFiles.get(rec.name.toLowerCase());
+    if (h) dirFileHandles[rec.id] = h;
+  }
+}
+
+function updateFolderUI() {
+  const hasDir = !!dirHandle;
+  btnSaveAll.disabled = !hasDir || images.length === 0;
+
+  if (hasDir) {
+    btnOpenFolder.textContent = '📂 Папка ✓';
+    btnOpenFolder.classList.add('active');
+    btnOpenFolder.title = 'Папка подключена. Клик — выбрать другую.';
+  } else {
+    btnOpenFolder.textContent = '📂 Папка';
+    btnOpenFolder.classList.remove('active');
+    btnOpenFolder.title = 'Открыть рабочую папку';
+  }
+}
+
+btnSaveAll.onclick = async () => {
+  if (!dirHandle) return;
+
+  btnSaveAll.disabled = true;
+  const oldText = btnSaveAll.textContent;
+  btnSaveAll.textContent = '⏳ Сохранение…';
+
+  let saved = 0, errors = 0;
+
+  try {
+    for (const im of images) {
+      try {
+        const name = ensureFileName(im);
+        const blob = await renderEditedBlob(im);
+        const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+
+        dirFileHandles[im.id] = fileHandle;
+
+        await dbPut({
+          id: im.id,
+          dept: im.dept,
+          data: im.data,
+          marks: im.marks,
+          texts: im.texts,
+          rects: im.rects || [],
+          added: im.added,
+          done: !!im.done,
+          name: name
+        });
+        im.name = name;
+
+        saved++;
+      } catch (e) {
+        console.error('Ошибка сохранения', im.id, e);
+        errors++;
+      }
+    }
+
+    alert(`Сохранено: ${saved}\nОшибок: ${errors}`);
+  } finally {
+    btnSaveAll.textContent = oldText;
+    btnSaveAll.disabled = false;
+  }
+};
+
+function ensureFileName(im) {
+  if (im.name) return im.name;
+  const ts = new Date(im.added);
+  const pad = n => String(n).padStart(2, '0');
+  return `photo_${im.id}_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.jpg`;
+}
+
+async function renderEditedBlob(im) {
+  const tmp = document.createElement('canvas');
+  tmp.width = im.el.naturalWidth;
+  tmp.height = im.el.naturalHeight;
+  const tctx = tmp.getContext('2d');
+  tctx.drawImage(im.el, 0, 0);
+  drawEdits(tctx, im, 1);
+
+  return new Promise((resolve, reject) => {
+    tmp.toBlob(b => {
+      if (b) resolve(b);
+      else reject(new Error('toBlob failed'));
+    }, 'image/jpeg', 0.92);
+  });
+}
+
+function idbHandleDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('fsHandlesDB', 1);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore('handles');
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function idbSaveHandle(handle) {
+  const dbh = await idbHandleDB();
+  return new Promise((res, rej) => {
+    const t = dbh.transaction('handles', 'readwrite');
+    t.objectStore('handles').put(handle, 'workDir');
+    t.oncomplete = () => res();
+    t.onerror = e => rej(e.target.error);
+  });
+}
+
+async function idbGetHandle() {
+  const dbh = await idbHandleDB();
+  return new Promise((res, rej) => {
+    const t = dbh.transaction('handles', 'readonly');
+    const r = t.objectStore('handles').get('workDir');
+    r.onsuccess = () => res(r.result || null);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+// ============================================================
+// Init
+// ============================================================
+(async function init() {
+  renderTabs();
+  setTool('mark');
+  updateArchiveButton();
+
+  try {
+    await openDB();
+  } catch (e) {
+    console.error('DB open failed', e);
+    overlay.innerHTML = '';
+    const msg = document.createElement('div');
+    msg.textContent = 'Ошибка открытия базы данных: ' + e.message;
+    const btn = document.createElement('button');
+    btn.textContent = 'Повторить';
+    btn.onclick = () => location.reload();
+    overlay.appendChild(msg);
+    overlay.appendChild(btn);
+    return;
+  }
+
+  await loadImages();
+
+  await restoreDirAccess();
+  updateFolderUI();
+
+  overlay.remove();
+
+  if ('serviceWorker' in navigator) {
+    try {
+      await navigator.serviceWorker.register('./sw.js');
+      console.log('Service Worker зарегистрирован');
+    } catch (e) {
+      console.warn('SW registration failed', e);
+    }
+  }
+})();
+</script>
+</body>
+</html>
